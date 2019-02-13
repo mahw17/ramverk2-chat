@@ -5,6 +5,9 @@
 "use strict";
 
 const port = process.env.DBWEBB_PORT || 1338;
+
+let users =[];
+
 const express = require("express");
 const http = require("http");
 //const url = require("url");
@@ -17,9 +20,6 @@ const wss = new WebSocket.Server({
     clientTracking: true, // keep track on connected clients,
     handleProtocols: handleProtocols // Manage what subprotocol to use.
 });
-
-//const broadcast = {};
-
 
 
 // Answer on all http requests
@@ -70,6 +70,7 @@ function broadcastExcept(ws, data) {
             if (ws.protocol === "json") {
                 let msg = {
                     timestamp: Date(),
+                    nick: ws.nick,
                     data: data
                 };
 
@@ -86,10 +87,11 @@ function broadcastExcept(ws, data) {
 
 // Setup for websocket requests.
 // Docs: https://github.com/websockets/ws/blob/master/doc/ws.md
-wss.on("connection", (ws/*, req*/) => {
+wss.on("connection", (ws, req) => {
+    ws.nick = req.url.substring(1);
     console.log("Connection received. Adding client.");
 
-    broadcastExcept(ws, `New client connected (${wss.clients.size}) using '${ws.protocol}'.`);
+    broadcastExcept(ws, `Joined chat.`);
     //console.log(ws);
 
     ws.on("message", (message) => {
