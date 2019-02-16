@@ -9,6 +9,8 @@ const port = process.env.DBWEBB_PORT || 1338;
 let users =[];
 
 const express = require("express");
+const cors = require('cors');
+
 const http = require("http");
 //const url = require("url");
 const WebSocket = require("ws");
@@ -21,13 +23,18 @@ const wss = new WebSocket.Server({
     handleProtocols: handleProtocols // Manage what subprotocol to use.
 });
 
+const mongo = require("mongodb").MongoClient;
+
+app.use(cors());
 
 // Answer on all http requests
-app.use(function (req, res) {
-    console.log("HTTP request on " + req.url);
-    res.send({ msg: "hello" });
-});
+app.use(async (req, res) => {
+    let log = await findInCollection();
 
+    console.log(log);
+    res.json(log);
+
+});
 
 
 /**
@@ -83,6 +90,35 @@ function broadcastExcept(ws, data) {
     console.log(`Broadcasted data to ${clients} (${wss.clients.size}) clients.`);
 }
 
+async function saveToDb(timestamp, nickname, message) {
+    const client  = await mongo.connect("mongodb://holmersson.se:27017/chat");
+    const db = await client.db();
+    const col = await db.collection("log");
+
+    // await col.deleteMany();
+    await col.insertOne(
+        {
+            "timestamp": timestamp,
+            "nickname": nickname,
+            "message": message
+        }
+    );
+
+    await client.close();
+
+    console.log("Message saved in database");
+}
+
+async function findInCollection() {
+    const client  = await mongo.connect("mongodb://holmersson.se:27017/chat");
+    const db = await client.db();
+    const col = await db.collection("log");
+    const res = await col.find().toArray();
+
+    await client.close();
+
+    return res;
+}
 
 
 // Setup for websocket requests.
@@ -97,6 +133,7 @@ wss.on("connection", (ws, req) => {
     ws.on("message", (message) => {
         console.log("Received: %s", message);
         broadcastExcept(ws, message);
+        saveToDb(Date(), ws.nick, message);
     });
 
     ws.on("error", (error) => {
